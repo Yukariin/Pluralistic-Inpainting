@@ -41,7 +41,11 @@ def center_mask(img):
     return mask
 
 
-def random_irregular_mask(img):
+def random_irregular_mask(img,
+                          min_stroke=1, max_stroke=4,
+                    min_vertex=1, max_vertex=12,
+                    min_length_divisor=10, max_length_divisor=18,
+                    min_brush_width_divisor=16, max_brush_width_divisor=10):
     """Generates a random irregular mask with lines, circles and elipses"""
     transform = transforms.Compose([transforms.ToTensor()])
     mask = torch.ones_like(img)
@@ -53,29 +57,28 @@ def random_irregular_mask(img):
     if size[1] < 64 or size[2] < 64:
         raise Exception("Width and Height of mask must be at least 64!")
 
-    number = random.randint(16, 64)
-    for _ in range(number):
-        model = random.random()
-        if model < 0.6:
-            # Draw random lines
-            x1, x2 = randint(1, size[1]), randint(1, size[1])
-            y1, y2 = randint(1, size[2]), randint(1, size[2])
-            thickness = randint(4, max_width)
-            cv2.line(img, (x1, y1), (x2, y2), (1, 1, 1), thickness)
+    min_length = size[1] // min_length_divisor
+    max_length = size[1] // max_length_divisor
+    min_brush_width = size[1] // min_brush_width_divisor
+    max_brush_width = size[1] // max_brush_width_divisor
+    max_angle = 2*np.pi
+    num_stroke = np.random.randint(min_stroke, max_stroke+1)
 
-        elif model > 0.6 and model < 0.8:
-            # Draw random circles
-            x1, y1 = randint(1, size[1]), randint(1, size[2])
-            radius = randint(4, max_width)
-            cv2.circle(img, (x1, y1), radius, (1, 1, 1), -1)
+    for _ in range(num_stroke):
+        num_vertex = np.random.randint(min_vertex, max_vertex+1)
+        start_x = np.random.randint(size[1])
+        start_y = np.random.randint(size[2])
 
-        elif model > 0.8:
-            # Draw random ellipses
-            x1, y1 = randint(1, size[1]), randint(1, size[2])
-            s1, s2 = randint(1, size[1]), randint(1, size[2])
-            a1, a2, a3 = randint(3, 180), randint(3, 180), randint(3, 180)
-            thickness = randint(4, max_width)
-            cv2.ellipse(img, (x1, y1), (s1, s2), a1, a2, a3, (1, 1, 1), thickness)
+        for _ in range(num_vertex):
+            angle = np.random.uniform(max_angle)
+            length = np.random.uniform(min_length, max_length)
+            brush_width = np.random.randint(min_brush_width, max_brush_width+1)
+            end_x = (start_x + length * np.sin(angle)).astype(np.int32)
+            end_y = (start_y + length * np.cos(angle)).astype(np.int32)
+
+            cv2.line(img, (start_y, start_x), (end_y, end_x), (1, 1, 1), brush_width)
+
+            start_x, start_y = end_x, end_y
 
     img = img.reshape(size[2], size[1])
     img = Image.fromarray(img*255)
